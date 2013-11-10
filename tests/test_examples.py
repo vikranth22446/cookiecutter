@@ -44,7 +44,6 @@ from tests import force_delete, CookiecutterCleanSystemTestCase
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
 
-@unittest.skipIf(condition=travis, reason='Works locally with tox but fails on Travis.')
 class TestPyPackage(CookiecutterCleanSystemTestCase):
 
 

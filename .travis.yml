@@ -14,6 +14,7 @@ python:
 # 1. the tests to be run with tox on Windows
 # 2. Windows users to use the requirements files without running into installation problems.
 install:
+ - sudo apt-get install mercurial
  - pip install coveralls
  - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then pip install -r requirements/test_26.txt; fi
  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install -r requirements/test_27.txt; fi

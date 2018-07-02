@@ -18,7 +18,7 @@ from .prompt import prompt_for_config
 from .replay import dump, load
 from .repository import determine_repo_dir
 from .utils import rmtree
-
+import sys
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +62,7 @@ def cookiecutter(
         no_input=no_input,
         password=password
     )
-
+    sys.path.insert(0, repo_dir) # allow importing of extensionsconte
     template_name = os.path.basename(os.path.abspath(repo_dir))
 
     if replay:

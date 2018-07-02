@@ -7,7 +7,7 @@ import copy
 import logging
 import os
 import io
-
+from collections import OrderedDict
 import poyo
 
 from .exceptions import ConfigDoesNotExistException
@@ -27,7 +27,7 @@ BUILTIN_ABBREVIATIONS = {
 DEFAULT_CONFIG = {
     'cookiecutters_dir': os.path.expanduser('~/.cookiecutters/'),
     'replay_dir': os.path.expanduser('~/.cookiecutter_replay/'),
-    'default_context': {},
+    'default_context': OrderedDict([]),
     'abbreviations': BUILTIN_ABBREVIATIONS,
 }
 

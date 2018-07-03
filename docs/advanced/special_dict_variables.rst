@@ -3,7 +3,7 @@
 Special Dictionary Variables (V???)
 -----------------------------------
 
-Dictionary variables can also be used to specify concepts such as custom prompt, description, visibility,
+Dictionary variables can also be used to specify concepts such as custom prompt, description, prompt_user,
 skip if, skip to, multilist, validation, welcome messages, etc.
 
 Basic Usage
@@ -83,7 +83,7 @@ an underscore. It uses the default attribute.
 
     {"version number": {
         "default": "1.0.0",
-        "visible" : false
+        "prompt_user" : false
     }}
 
 
@@ -95,7 +95,7 @@ In order to pass lists in to the system specify it in the default property.
 
     {"keywords": {
         "default": ["template","flask","django","node.js"],
-        "visible" : false
+        "prompt_user" : false
     }}
 
 Example Debug/Welcome Message
@@ -106,13 +106,13 @@ Set visibility to false and set the description to the message
 ::
 
     {"welcome message": {
-        "visible": false,
+        "prompt_user": false,
         "description": "Welcome to the cookiecutter template......"
     },
-    "authors": {"visible": false, "description": "The author of this template is the CookieMonster"},
-    "url": {"visible": false, "description": "The url to the repo is https://github.com/audreyr/cookiecutter" },
+    "authors": {"prompt_user": false, "description": "The author of this template is the CookieMonster"},
+    "url": {"prompt_user": false, "description": "The url to the repo is https://github.com/audreyr/cookiecutter" },
     "keywords":
-        {   "visible": false,
+        {   "prompt_user": false,
             "default": ["template","flask","django","node.js"]},
         },
     "project_name": "reddit clone"

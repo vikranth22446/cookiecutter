@@ -229,7 +229,7 @@ def prompt_choice_for_config(cookiecutter_dict, env, key, options, no_input):
 ATTRIBUTES = [
     "type",
     "default",
-    "visible",
+    "prompt_user",
     "description",
     "prompt",
     "hide_input",
@@ -345,7 +345,7 @@ def prompt_for_config(context, no_input=False):
                             skip_to_variable = skip_to
                         continue
 
-                    if val.get("visible") is False:
+                    if val.get("prompt_user") is False:
                         cookiecutter_dict[key] = default
                         continue
 

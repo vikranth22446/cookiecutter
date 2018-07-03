@@ -286,7 +286,7 @@ class TestV2DictConfig:
             'cookiecutter': {
                 'details': {
                     'default': 'test',
-                    "visible": False
+                    "prompt_user": False
                 }
             }
         }
@@ -305,7 +305,7 @@ class TestV2DictConfig:
             'cookiecutter': {
                 'details': {
                     'default': 'Sample',
-                    "visible": True
+                    "prompt_user": True
                 }
             }
         }

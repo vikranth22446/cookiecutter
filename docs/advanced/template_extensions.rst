@@ -64,3 +64,14 @@ For example, place the localExtension in the previous example at template/extens
         "project_slug": "Foobar",
         "_extensions": ["local.CustomExtension"]
     }
+::
+
+    Cookiecutter Template
+    ├── LICENCE.txt
+    ├── extensions
+        ├──__init__.py
+        ├──local_extension.py
+    ├── {{ cookiecutter.proj_name }}
+    │   ├── README.md
+
+

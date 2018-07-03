@@ -106,8 +106,8 @@ def read_user_choice(var_name, options, multiple=False):
         prompt = u'\n'.join((
             u'Select {}:'.format(var_name),
             u'\n'.join(choice_lines),
-            u'Choose multiple from {}'.format(u', '.join(choices)),
-            u"Use commas to seperate the items in the list"
+            u"Use commas to separate the items in the multi list"
+            u'Choose from {}'.format(u', '.join(choices)),
         ))
 
     def select_multiple_choices(indices, lst):
@@ -255,8 +255,13 @@ def supports_new_format(dic):
                 return False
         return True
 
-    return foreach(dic.keys(), lambda x: x in ATTRIBUTES) and dic.get("default") is not None and supported_type(
-        dic.get("type", "string"))
+    def has_default(dic):
+        return dic.get("default") is not None or dic.get("choices")
+
+    def has_supported_attributes(dic):
+        return foreach(dic.keys(), lambda x: x in ATTRIBUTES)
+
+    return has_supported_attributes(dic) and has_default(dic) and supported_type(dic.get("type", "string"))
 
 
 def validate(regex, key, f, max_times_validated=5):
@@ -302,6 +307,7 @@ def prompt_for_config(context, no_input=False):
         if key.startswith(u'_'):
             cookiecutter_dict[key] = raw
             continue
+
         if skip_to_variable:
             if skip_to_variable == key:
                 skip_to_variable = None
@@ -326,6 +332,7 @@ def prompt_for_config(context, no_input=False):
                     if not no_input:
                         cookiecutter_dict[key] = read_user_dict(key, val)
                 else:
+                    default = val.get("default")
                     if "description" in val:
                         click.echo(val.get("description"))
 
@@ -339,22 +346,22 @@ def prompt_for_config(context, no_input=False):
                         continue
 
                     if val.get("visible") is False:
-                        cookiecutter_dict[key] = val.get("default")
+                        cookiecutter_dict[key] = default
                         continue
 
                     prompt = val.get("prompt", key)
                     prompt_f = SUPPORTED_TYPES[val.get("type", "string")]
-                    default = val.get("default")
-                    prompt_f = validate(val.get("validation"), key, prompt_f)
-                    if val.get("choices"):
-                        choices = val.get("choices")
-                        default = choices[0]
+                    validation, max_validation = val.get("validation"), val.get("max_times_validated", 5)
+                    prompt_f = validate(validation, key, prompt_f, max_times_validated=max_validation)
+                    choices = val.get("choices")
+                    if not choices:
+                        cookiecutter_dict[key] = prompt_f(prompt, default) if not no_input else default
+                    else:
+                        default = choices[0] if not default else default
                         if no_input:
                             cookiecutter_dict[key] = default
                             continue
                         cookiecutter_dict[key] = prompt_f(prompt, choices, multiple=is_multi_list(val))
-                    else:
-                        cookiecutter_dict[key] = prompt_f(prompt, default) if not no_input else default
         except UndefinedError as err:
             msg = "Unable to render variable '{}'".format(key)
             raise UndefinedVariableInTemplate(msg, err, context)

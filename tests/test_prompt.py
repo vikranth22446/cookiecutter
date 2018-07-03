@@ -11,7 +11,6 @@ import platform
 from collections import OrderedDict
 
 import pytest
-from jinja2 import UndefinedError
 
 from cookiecutter import prompt, exceptions, environment
 
@@ -257,6 +256,7 @@ class TestV2DictConfig:
     def test_dict_format_support(self):
         assert prompt.supports_new_format({'default': 'test', 'type': "string"})
         assert not prompt.supports_new_format({'data': ["list1", "list2"], "other data": "string"})
+        assert prompt.supports_new_format({'default': False, 'type': "bool"})
 
     def test_dict_valid_supported_types(self):
         assert prompt.supports_new_format({'default': 'test', 'type': "int"})
@@ -485,15 +485,25 @@ class TestV2DictConfig:
             "options": "3"
         }
         assert prompt.prompt_for_config(context, no_input=True) == {"options": "1"}
-        context["cookiecutter"]["options"]["default"] = "a"
-        with pytest.raises(exceptions.UndefinedVariableInTemplate) as err:
-            prompt.prompt_for_config(context)
-        error = err.value
-        assert error.message == "Unable to render variable 'options'"
-        assert error.context == context
 
-    def test_dict_multilist(self):
-        pass
+    def test_dict_multilist(self, mocker):
+        choices = ["var1", "var2", "var3", "var4", "var5"]
+        click_prompt = mocker.patch("click.prompt")
+        click_prompt.return_value = "1,2,3"
+
+        context = {
+            'cookiecutter': {
+                "options": {
+                    "default": "var1",
+                    "choices": choices,
+                    "type": "multilist"
+                }
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "options": ["var1", "var2", "var3"]
+        }
+        assert prompt.prompt_for_config(context, no_input=True) == {"options": "var1"}
 
     def test_dict_str(self, monkeypatch, reload_supported_types):
         monkeypatch.setattr(
@@ -514,8 +524,49 @@ class TestV2DictConfig:
             'details': "A Random String"
         }
 
-    def test_dict_raw_types(self):
-        pass
+    def test_dict_int_float(self, monkeypatch, reload_supported_types):
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_int',
+            lambda var, default: 3
+        )
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_float',
+            lambda var, default: 3.5
+        )
+        reload_supported_types()
+        context = \
+            {'cookiecutter':
+                {'details': {
+                    'default': 2,
+                    'type': "int"}
+                }
+            }
+
+        assert prompt.prompt_for_config(context) == {
+            'details': 3
+        }
+        context["cookiecutter"]["details"]["type"] = "float"
+        context["cookiecutter"]["details"]["default"] = 2.3
+        assert prompt.prompt_for_config(context) == {
+            'details': 3.5
+        }
+
+    def test_dict_bool(self, monkeypatch, reload_supported_types):
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_yes_no',
+            lambda var, default: True
+        )
+        reload_supported_types()
+        context = \
+            {'cookiecutter':
+                {'details': {
+                    'default': False,
+                    'type': "bool"}
+                }
+            }
+        assert prompt.prompt_for_config(context) == {
+            'details': True
+        }
 
 
 class TestReadUserChoice(object):

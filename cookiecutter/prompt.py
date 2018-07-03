@@ -114,11 +114,11 @@ def read_user_choice(var_name, options, multiple=False):
         try:
             return [lst[i] for i in indices]
         except Exception:
-            raise click.UsageError("The selected options are not in the list")
+            raise UndefinedError("The selected options are not in the list")
 
     if multiple:
         user_choice = click.prompt(prompt, default=default)
-        selected_choice = [user_choice.strip() for x in user_choice.split(',')]
+        selected_choice = [x.strip() for x in user_choice.split(',')]
         return select_multiple_choices(selected_choice, choice_map)
 
     user_choice = click.prompt(
@@ -255,8 +255,8 @@ def supports_new_format(dic):
                 return False
         return True
 
-    return foreach(dic.keys(), lambda x: x in ATTRIBUTES) and dic.get("default") and \
-           supported_type(dic.get("type", "string"))
+    return foreach(dic.keys(), lambda x: x in ATTRIBUTES) and dic.get("default") is not None and supported_type(
+        dic.get("type", "string"))
 
 
 def validate(regex, key, f, max_times_validated=5):
@@ -348,8 +348,7 @@ def prompt_for_config(context, no_input=False):
                     prompt_f = validate(val.get("validation"), key, prompt_f)
                     if val.get("choices"):
                         choices = val.get("choices")
-                        if default not in choices:
-                            raise UndefinedError("The default option not in the choices")
+                        default = choices[0]
                         if no_input:
                             cookiecutter_dict[key] = default
                             continue

@@ -104,7 +104,7 @@ def read_user_choice(var_name, options, multiple=False):
     prompt = u'\n'.join((
         u'Select {}:'.format(var_name),
         u'\n'.join(choice_lines),
-        u'Choose' + 'from {}'.format(u', '.join(choices))
+        u'Choose from {}'.format(u', '.join(choices))
     ))
     if multiple:
         prompt = u'\n'.join((
@@ -198,8 +198,8 @@ def render_variable(env, raw, cookiecutter_dict):
             render_variable(env, v, cookiecutter_dict)
             for v in raw
         ]
-    elif raw.lower() == "true" or raw.lower() == "false":
-        return raw.lower() == "true"
+    elif str(raw).lower() == "true" or str(raw).lower() == "false":
+        return str(raw).lower() == "true"
     elif not isinstance(raw, basestring):
         return raw
     template = env.from_string(raw)
@@ -246,8 +246,12 @@ ATTRIBUTES = [
 ]
 
 
+def is_multi_list(dic):
+    return dic.get("type") == "multilist"
+
+
 def supports_new_format(dic):
-    return dic.keys() in ATTRIBUTES
+    return dic.keys() in ATTRIBUTES and dic.get("default")
 
 
 def prompt_for_config(context, no_input=False):
@@ -279,10 +283,17 @@ def prompt_for_config(context, no_input=False):
                 cookiecutter_dict[key] = val[0] if no_input else read_user_choice(key, val)
             elif isinstance(val, bool):
                 cookiecutter_dict[key] = read_user_yes_no(key + "?", val)
+            elif isinstance(val, basestring):
+                cookiecutter_dict[key] = val if no_input else read_user_variable(key, val)
             elif isinstance(val, dict):
-                if supports_new_format(val):
+                cookiecutter_dict[key] = val
+                if not supports_new_format(val):
+                    if not no_input:
+                        cookiecutter_dict[key] = read_user_dict(key, val)
+                else:
                     if "description" in val:
                         click.echo(val.get("description"))
+
                     if val.get("skip_if") is True:
                         click.echo("skipped " + key)
                         cookiecutter_dict[key] = None
@@ -291,25 +302,29 @@ def prompt_for_config(context, no_input=False):
                             click.echo("Skipping to " + skip_to)
                             skip_to_variable = skip_to
                         continue
+
                     if val.get("visible") is False:
                         cookiecutter_dict[key] = raw
                         continue
+
                     prompt = val.get("prompt", key)
                     prompt_f = SUPPORTED_TYPES[val.get("type", "string")]
+
                     if val.get("choices"):
-                        cookiecutter_dict[key] = prompt_f(prompt, val.get("choices"),
-                                                          multiple=(val.get("type") == "multilist"))
+                        choices = val.get("choices")
+                        default = [] if len(choices) == 0 else choices[0]
+                        if no_input:
+                            cookiecutter_dict[key] = default
+                            continue
+                        cookiecutter_dict[key] = prompt_f(prompt, choices, multiple=is_multi_list(val))
                     else:
-                        cookiecutter_dict[key] = prompt_f(prompt, val.get("default", ""))
-                else:
-                    cookiecutter_dict[key] = read_user_dict(key, val)
-            elif not isinstance(raw, dict):
-                if not no_input:
-                    val = read_user_variable(key, val)
-                cookiecutter_dict[key] = val
+                        if not no_input:
+                            cookiecutter_dict[key] = prompt_f(prompt, val.get("default", ""))
         except UndefinedError as err:
             msg = "Unable to render variable '{}'".format(key)
             raise UndefinedVariableInTemplate(msg, err, context)
+
     if skip_to_variable:
         click.echo("Processed all variables, but skip_to_variable '{}' was never found.".format(skip_to_variable))
+
     return cookiecutter_dict

@@ -7,40 +7,12 @@ test_prompt
 Tests for `cookiecutter.prompt` module.
 """
 
-from collections import OrderedDict
 import platform
+from collections import OrderedDict
 
 import pytest
-from past.builtins import basestring
 
 from cookiecutter import prompt, exceptions, environment
-
-
-@pytest.mark.parametrize('raw_var, rendered_var', [
-    (1, '1'),
-    (True, 'True'),
-    ('foo', 'foo'),
-    ('{{cookiecutter.project}}', 'foobar'),
-    (None, None),
-])
-def test_convert_to_str(mocker, raw_var, rendered_var):
-    env = environment.StrictEnvironment()
-    from_string = mocker.patch(
-        'cookiecutter.prompt.StrictEnvironment.from_string',
-        wraps=env.from_string
-    )
-    context = {'project': 'foobar'}
-
-    result = prompt.render_variable(env, raw_var, context)
-    assert result == rendered_var
-
-    # Make sure that non None non str variables are converted beforehand
-    if raw_var is not None:
-        if not isinstance(raw_var, basestring):
-            raw_var = str(raw_var)
-        from_string.assert_called_once_with(raw_var)
-    else:
-        assert not from_string.called
 
 
 @pytest.fixture(autouse=True)
@@ -120,7 +92,7 @@ class TestPrompt(object):
         context = {'cookiecutter': {'details': {}}}
 
         cookiecutter_dict = prompt.prompt_for_config(context)
-        assert cookiecutter_dict == {
+        assert cookiecutter_dict == OrderedDict({
             'details': {
                 "key": "value",
                 "integer_key": 37,
@@ -139,7 +111,7 @@ class TestPrompt(object):
                     "value 3",
                 ]
             }
-        }
+        })
 
     def test_should_render_dict(self):
         context = {
@@ -187,15 +159,15 @@ class TestPrompt(object):
         }
 
         cookiecutter_dict = prompt.prompt_for_config(context, no_input=True)
-        assert cookiecutter_dict == {
+        assert cookiecutter_dict == OrderedDict({
             'project_name': "Slartibartfast",
             'details': {
                 "key": "value",
-                "integer_key": "37",
+                "integer_key": 37,
                 "other_name": "Slartibartfast",
                 "dict_key": {
                     "deep_key": "deep_value",
-                    "deep_integer": "42",
+                    "deep_integer": 42,
                     "deep_other_name": "Slartibartfast",
                     "deep_list": [
                         "deep value 1",
@@ -209,7 +181,7 @@ class TestPrompt(object):
                     "value 3",
                 ]
             }
-        }
+        })
 
     def test_unicode_prompt_for_config_unicode(self, monkeypatch):
         monkeypatch.setattr(
@@ -264,30 +236,64 @@ class TestPrompt(object):
         assert cookiecutter_dict == {'_copy_without_render': ['*.html']}
 
 
+class TestDictConfig:
+    def test_dict_format_support(self):
+        pass
+
+    def test_dict_valid_supported_types(self):
+        pass
+
+    def test_dict_invalid_types(self):
+        pass
+
+    def test_dict_description(self):
+        pass
+
+    def test_dict_prompt_visibility(self):
+        pass
+
+    def test_dict_custom_prompt(self):
+        pass
+
+    def test_dict_invalid_prompt(self):
+        pass
+
+    def test_dict_hide_input(self):
+        pass
+
+    def test_dict_skip_if(self):
+        pass
+
+    def test_dict_validation(self):
+        pass
+
+    def test_dict_basic_list(self):
+        pass
+
+    def test_dict_multilist(self):
+        pass
+
+    def test_dict_raw_types(self):
+        pass
+
+
 class TestReadUserChoice(object):
     def test_should_invoke_read_user_choice(self, mocker):
-        prompt_choice = mocker.patch(
-            'cookiecutter.prompt.prompt_choice_for_config',
-            wraps=prompt.prompt_choice_for_config
-        )
-
         read_choice = mocker.patch('cookiecutter.prompt.read_user_choice')
         read_choice.return_value = 'all'
 
         read_variable = mocker.patch('cookiecutter.prompt.read_user_variable')
 
-        CHOICES = ['landscape', 'portrait', 'all']
-        CONTEXT = {
+        choices = ['landscape', 'portrait', 'all']
+        context = {
             'cookiecutter': {
-                'orientation': CHOICES
+                'orientation': choices
             }
         }
 
-        cookiecutter_dict = prompt.prompt_for_config(CONTEXT)
-
+        cookiecutter_dict = prompt.prompt_for_config(context)
         assert not read_variable.called
-        assert prompt_choice.called
-        read_choice.assert_called_once_with('orientation', CHOICES)
+        read_choice.assert_called_once_with('orientation', choices)
         assert cookiecutter_dict == {'orientation': 'all'}
 
     def test_should_not_invoke_read_user_variable(self, mocker):

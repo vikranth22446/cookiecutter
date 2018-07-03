@@ -74,13 +74,6 @@ def read_repo_password(question, default=None):
     return click.prompt(question, hide_input=True)
 
 
-def select_multiple_choices(indices, lst):
-    try:
-        return [lst[i] for i in indices]
-    except Exception:
-        raise click.UsageError("The selected options are not in the list")
-
-
 def read_user_choice(var_name, options, multiple=False):
     """Prompt the user to choose from several options for the given variable.
 
@@ -116,6 +109,13 @@ def read_user_choice(var_name, options, multiple=False):
             u'Choose multiple from {}'.format(u', '.join(choices)),
             u"Use commas to seperate the items in the list"
         ))
+
+    def select_multiple_choices(indices, lst):
+        try:
+            return [lst[i] for i in indices]
+        except Exception:
+            raise click.UsageError("The selected options are not in the list")
+
     if multiple:
         user_choice = click.prompt(prompt, default=default)
         selected_choice = [user_choice.strip() for x in user_choice.split(',')]
@@ -348,7 +348,8 @@ def prompt_for_config(context, no_input=False):
                     prompt_f = validate(val.get("validation"), key, prompt_f)
                     if val.get("choices"):
                         choices = val.get("choices")
-                        default = [] if len(choices) == 0 else choices[0]
+                        if default not in choices:
+                            raise UndefinedError("The default option not in the choices")
                         if no_input:
                             cookiecutter_dict[key] = default
                             continue

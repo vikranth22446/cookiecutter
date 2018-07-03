@@ -11,6 +11,7 @@ import platform
 from collections import OrderedDict
 
 import pytest
+from jinja2 import UndefinedError
 
 from cookiecutter import prompt, exceptions, environment
 
@@ -466,8 +467,30 @@ class TestV2DictConfig:
         assert prompt.validate("", None, lambda: True)()
         assert prompt.validate("(\w+)@gmail.com", "key", lambda: "test@gmail.com")() == "test@gmail.com"
 
-    def test_dict_basic_list(self):
-        pass
+    def test_dict_basic_list(self, mocker):
+        choices = ["1", "2", "3", "4"]
+        click_prompt = mocker.patch("click.prompt")
+        click_prompt.return_value = "3"
+
+        context = {
+            'cookiecutter': {
+                "options": {
+                    "default": "1",
+                    "choices": choices,
+                    "type": "list"
+                }
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "options": "3"
+        }
+        assert prompt.prompt_for_config(context, no_input=True) == {"options": "1"}
+        context["cookiecutter"]["options"]["default"] = "a"
+        with pytest.raises(exceptions.UndefinedVariableInTemplate) as err:
+            prompt.prompt_for_config(context)
+        error = err.value
+        assert error.message == "Unable to render variable 'options'"
+        assert error.context == context
 
     def test_dict_multilist(self):
         pass

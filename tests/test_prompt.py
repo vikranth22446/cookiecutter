@@ -159,7 +159,7 @@ class TestPrompt(object):
         }
 
         cookiecutter_dict = prompt.prompt_for_config(context, no_input=True)
-        assert cookiecutter_dict == OrderedDict({
+        assert cookiecutter_dict == {
             'project_name': "Slartibartfast",
             'details': {
                 "key": "value",
@@ -181,7 +181,7 @@ class TestPrompt(object):
                     "value 3",
                 ]
             }
-        })
+        }
 
     def test_unicode_prompt_for_config_unicode(self, monkeypatch):
         monkeypatch.setattr(
@@ -236,42 +236,260 @@ class TestPrompt(object):
         assert cookiecutter_dict == {'_copy_without_render': ['*.html']}
 
 
-class TestDictConfig:
+class TestV2DictConfig:
+    @pytest.fixture()
+    def reload_supported_types(self):
+        def make_reloader():
+            prompt.SUPPORTED_TYPES = {
+                "multilist": prompt.read_user_choice,
+                "list": prompt.read_user_choice,
+                "string": prompt.read_user_variable,
+                "int": prompt.read_user_int,
+                "float": prompt.read_user_float,
+                "bool": prompt.read_user_yes_no,
+                "password": prompt.read_repo_password,
+                "json": prompt.read_user_dict
+            }
+
+        return make_reloader
+
     def test_dict_format_support(self):
-        pass
+        assert prompt.supports_new_format({'default': 'test', 'type': "string"})
+        assert not prompt.supports_new_format({'data': ["list1", "list2"], "other data": "string"})
 
     def test_dict_valid_supported_types(self):
-        pass
+        assert prompt.supports_new_format({'default': 'test', 'type': "int"})
+        assert not prompt.supports_new_format({'default': 'test', 'type': "a random type not in the list"}, )
+        assert prompt.supported_type("int")
+        assert not prompt.supported_type("A random type")
 
-    def test_dict_invalid_types(self):
-        pass
+    def test_dict_click_description(self, mocker):
+        echo = mocker.patch('click.echo')
+        context = {
+            'cookiecutter': {
+                'project_name': 'Sample Project',
+                'details': {
+                    'default': 'test',
+                    'description': 'This is a description of the field that is printed before the variable',
+                    "type": "string"
+                }
+            }
+        }
+        prompt.prompt_for_config(context, no_input=True)
+        echo.assert_called_once_with('This is a description of the field that is printed before the variable')
 
-    def test_dict_description(self):
-        pass
+    def test_dict_prompt_invisible(self, mocker, reload_supported_types):
+        read_variable = mocker.patch('cookiecutter.prompt.read_user_variable')
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                'details': {
+                    'default': 'test',
+                    "visible": False
+                }
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "details": "test"
+        }
+        assert not read_variable.called
 
-    def test_dict_prompt_visibility(self):
-        pass
+    def test_dict_prompt_visible(self, monkeypatch, reload_supported_types):
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable',
+            lambda var, default: "This is a string variable read from the prompt"
+        )
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                'details': {
+                    'default': 'Sample',
+                    "visible": True
+                }
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "details": "This is a string variable read from the prompt"
+        }
 
-    def test_dict_custom_prompt(self):
-        pass
+    def test_dict_custom_prompt(self, monkeypatch, mocker, reload_supported_types):
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable',
+            lambda var, default: 'test2'
+        )
+        read_variable = mocker.patch('cookiecutter.prompt.read_user_variable')
+        read_variable.return_value = "test2"
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                'details': {
+                    'default': 'test',
+                    "prompt": "This is a custom prompt"
+                }
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "details": "test2"
+        }
+        read_variable.assert_called_once_with("This is a custom prompt", "test")
 
-    def test_dict_invalid_prompt(self):
-        pass
+    def test_dict_skip_if(self, monkeypatch, mocker, reload_supported_types):
+        echo = mocker.patch('click.echo')
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable', lambda var, default: default
+        )
+        monkeypatch.setattr(
+            "cookiecutter.prompt.read_user_yes_no", lambda var, default: default
+        )
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                "project_name": "Sample Project",
+                "test": "{% if cookiecutter.project_name == 'Sample Project' %}true{%endif%}",
+                'details': {
+                    'default': 'test',
+                    "skip_if": "{% if cookiecutter.project_name == 'Sample Project' %}true{%else%}false{%endif%}"
+                },
+                "next_variable": "Skipped to current variable"
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "project_name": "Sample Project",
+            "details": None,
+            "next_variable": "Skipped to current variable",
+            "test": True
+        }
+        echo.assert_any_call("skipped " + "details")
 
-    def test_dict_hide_input(self):
-        pass
+    def test_dict_skip_to(self, monkeypatch, mocker, reload_supported_types):
+        echo = mocker.patch('click.echo')
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable', lambda var, default: default
+        )
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                "project_name": "Sample Project",
+                'details': {
+                    'default': 'test',
+                    "skip_if": "{% if cookiecutter.project_name == 'Sample Project' %}true{%else%}false{%endif%}",
+                    "skip_to": "future_variable"
+                },
+                "next_variable": "Skipped variable",
+                "future_variable": "Some Variable"
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "project_name": "Sample Project",
+            "details": None,
+            "next_variable": None,
+            "future_variable": "Some Variable"
+        }
+        echo.assert_any_call("skipped " + "details")
+        echo.assert_any_call("skipped " + "next_variable")
+        echo.assert_any_call("skipping to " + "future_variable")
 
-    def test_dict_skip_if(self):
-        pass
+    def test_dict_skip_to_invalid(self, monkeypatch, mocker, reload_supported_types):
+        echo = mocker.patch('click.echo')
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable', lambda var, default: default
+        )
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                "project_name": "Sample Project",
+                'details': {
+                    'default': 'test',
+                    "skip_if": "{% if cookiecutter.project_name == 'Sample Project' %}true{%else%}false{%endif%}",
+                    "skip_to": "Invalid Variable"
+                },
+                "next_variable": None,
+                "future_variable": None
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "project_name": "Sample Project",
+            "details": None,
+            "next_variable": None,
+            "future_variable": None
+        }
+        echo.assert_any_call("skipped " + "details")
+        echo.assert_any_call("skipping to " + "Invalid Variable")
+        echo.assert_any_call("skipped " + "next_variable")
+        echo.assert_any_call("skipped " + "future_variable")
+        echo.assert_any_call("Processed all variables, but skip_to_variable 'Invalid Variable' was never found.")
 
-    def test_dict_validation(self):
-        pass
+    def test_dict_correct_validation(self, monkeypatch, reload_supported_types):
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable', lambda var, default: default
+        )
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                "project_name": {
+                    "default": "Sample Project",
+                },
+                "email": {
+                    "default": "test@gmail.com",
+                    "validation": "(\w+)@gmail.com"
+                }
+            }
+        }
+        assert prompt.prompt_for_config(context) == {
+            "project_name": "Sample Project",
+            "email": "test@gmail.com"
+        }
+
+    def test_dict_invalid_validation(self, monkeypatch, reload_supported_types):
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable', lambda var, default: default
+        )
+        reload_supported_types()
+        context = {
+            'cookiecutter': {
+                "project_name": {
+                    "default": "Sample Project",
+                },
+                "email": {
+                    "default": "test",
+                    "validation": "(\w+)@gmail.com"
+                }
+            }
+        }
+        with pytest.raises(exceptions.UndefinedVariableInTemplate) as err:
+            prompt.prompt_for_config(context)
+        error = err.value
+        assert error.message == "Unable to render variable 'email'"
+        assert error.context == context
+
+    def test_validation_wrapper(self):
+        assert prompt.validate("", None, lambda: True)()
+        assert prompt.validate("(\w+)@gmail.com", "key", lambda: "test@gmail.com")() == "test@gmail.com"
 
     def test_dict_basic_list(self):
         pass
 
     def test_dict_multilist(self):
         pass
+
+    def test_dict_str(self, monkeypatch, reload_supported_types):
+        monkeypatch.setattr(
+            'cookiecutter.prompt.read_user_variable',
+            lambda var, default: 'A Random String'
+        )
+        reload_supported_types()
+        context = \
+            {'cookiecutter':
+                {'details': {
+                    'default': 'test',
+                    'type': "string"}
+                }
+            }
+
+        cookiecutter_dict = prompt.prompt_for_config(context)
+        assert cookiecutter_dict == {
+            'details': "A Random String"
+        }
 
     def test_dict_raw_types(self):
         pass

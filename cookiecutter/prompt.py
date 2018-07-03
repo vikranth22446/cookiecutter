@@ -8,6 +8,7 @@ Functions for prompting the user for project info.
 """
 
 import json
+import re
 from collections import OrderedDict
 
 import click
@@ -27,6 +28,8 @@ def read_user_variable(var_name, default_value):
     :param default_value: Value that will be returned if no input happens
     """
     # Please see http://click.pocoo.org/4/api/#click.prompt
+    if var_name == "":
+        raise UndefinedError
     return click.prompt(var_name, default=default_value)
 
 
@@ -198,13 +201,15 @@ def render_variable(env, raw, cookiecutter_dict):
             render_variable(env, v, cookiecutter_dict)
             for v in raw
         ]
-    elif str(raw).lower() == "true" or str(raw).lower() == "false":
-        return str(raw).lower() == "true"
     elif not isinstance(raw, basestring):
         return raw
     template = env.from_string(raw)
 
     rendered_template = template.render(cookiecutter=cookiecutter_dict)
+    # Support booleans with Jinja Templates
+    if str(rendered_template).lower() == "true" or str(rendered_template).lower() == "false":
+        return str(rendered_template).lower() == "true"
+
     return rendered_template
 
 
@@ -221,19 +226,8 @@ def prompt_choice_for_config(cookiecutter_dict, env, key, options, no_input):
     return read_user_choice(key, rendered_options)
 
 
-SUPPORTED_TYPES = {
-    "multilist": read_user_choice,
-    "list": read_user_choice,
-    "string": read_user_variable,
-    "int": read_user_int,
-    "float": read_user_float,
-    "bool": read_user_yes_no,
-    "password": read_repo_password,
-    "json": read_user_dict
-}
-
 ATTRIBUTES = [
-    "type"
+    "type",
     "default",
     "visible",
     "description",
@@ -250,8 +244,47 @@ def is_multi_list(dic):
     return dic.get("type") == "multilist"
 
 
+def supported_type(type):
+    return type in list(SUPPORTED_TYPES.keys())
+
+
 def supports_new_format(dic):
-    return dic.keys() in ATTRIBUTES and dic.get("default")
+    def foreach(keys, f):
+        for i in keys:
+            if not f(i):
+                return False
+        return True
+
+    return foreach(dic.keys(), lambda x: x in ATTRIBUTES) and dic.get("default") and \
+           supported_type(dic.get("type", "string"))
+
+
+def validate(regex, key, f, max_times_validated=5):
+    regex = re.compile(regex) if regex else regex
+
+    def make_validation_func(*args, **kwargs):
+        if not regex:
+            return f(*args, **kwargs)
+        for _ in range(max_times_validated):
+            val = f(*args, **kwargs)
+            if re.match(regex, val):
+                return val
+            click.echo("Invalid Pattern for {}. Please follow the format {}".format(key, str(regex)))
+        raise UndefinedError
+
+    return make_validation_func
+
+
+SUPPORTED_TYPES = {
+    "multilist": read_user_choice,
+    "list": read_user_choice,
+    "string": read_user_variable,
+    "int": read_user_int,
+    "float": read_user_float,
+    "bool": read_user_yes_no,
+    "password": read_repo_password,
+    "json": read_user_dict
+}
 
 
 def prompt_for_config(context, no_input=False):
@@ -261,6 +294,7 @@ def prompt_for_config(context, no_input=False):
 
     :param no_input: Prompt the user at command line for manual configuration?
     """
+
     cookiecutter_dict = OrderedDict([])
     env = StrictEnvironment(context=context)
     skip_to_variable = None
@@ -272,7 +306,8 @@ def prompt_for_config(context, no_input=False):
             if skip_to_variable == key:
                 skip_to_variable = None
             else:
-                click.echo("Skipped " + key)
+                cookiecutter_dict[key] = None
+                click.echo("skipped " + key)
                 continue
         try:
             val = render_variable(env, raw, cookiecutter_dict)
@@ -299,17 +334,18 @@ def prompt_for_config(context, no_input=False):
                         cookiecutter_dict[key] = None
                         skip_to = val.get("skip_to")
                         if val.get("skip_to"):
-                            click.echo("Skipping to " + skip_to)
+                            click.echo("skipping to " + skip_to)
                             skip_to_variable = skip_to
                         continue
 
                     if val.get("visible") is False:
-                        cookiecutter_dict[key] = raw
+                        cookiecutter_dict[key] = val.get("default")
                         continue
 
                     prompt = val.get("prompt", key)
                     prompt_f = SUPPORTED_TYPES[val.get("type", "string")]
-
+                    default = val.get("default")
+                    prompt_f = validate(val.get("validation"), key, prompt_f)
                     if val.get("choices"):
                         choices = val.get("choices")
                         default = [] if len(choices) == 0 else choices[0]
@@ -318,8 +354,7 @@ def prompt_for_config(context, no_input=False):
                             continue
                         cookiecutter_dict[key] = prompt_f(prompt, choices, multiple=is_multi_list(val))
                     else:
-                        if not no_input:
-                            cookiecutter_dict[key] = prompt_f(prompt, val.get("default", ""))
+                        cookiecutter_dict[key] = prompt_f(prompt, default) if not no_input else default
         except UndefinedError as err:
             msg = "Unable to render variable '{}'".format(key)
             raise UndefinedVariableInTemplate(msg, err, context)

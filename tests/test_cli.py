@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import os
 import json
 
 from click.testing import CliRunner

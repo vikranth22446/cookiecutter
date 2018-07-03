@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
 import io
+import os
 import sys
 
 from setuptools import setup
@@ -37,9 +37,8 @@ if sys.argv[-1] == 'readme':
     print(readme)
     sys.exit()
 
-
 setup(
-    name='cookiecutter',
+    name='cookiecutter_v2',
     version=version,
     description=('A command-line utility that creates projects from project '
                  'templates, e.g. creating a Python package project from a '

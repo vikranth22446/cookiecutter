@@ -1,0 +1,8 @@
+{
+  "project_slug": "Foobar",
+  "year": "{% now 'utc', '%Y' %}",
+  "name": "World",
+  "_extensions": [
+    "extensions.local_extension.LocalExtension"
+  ]
+}
